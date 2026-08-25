@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radar‑SPD 雷达风廓线向下折算工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    max-width:840px;
+    margin:32px auto;
+    padding:0 18px;
+    background: linear-gradient(135deg,#eef2f8,#e3eaf5);
+    color:#161e2e;
+    animation: pageFadeIn 0.6s ease;
+}
+@keyframes pageFadeIn {
+    from{opacity:0;transform:translateY(12px)}
+    to{opacity:1;transform:translateY(0)}
+}
+.card{
+    background:#ffffff;
+    padding:26px;
+    border-radius:16px;
+    box-shadow: 0 4px 18px rgba(22, 30, 46, 0.08);
+    margin-bottom:20px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.card:hover{
+    transform: translateY(-2px);
+    box-shadow:0 8px 24px rgba(22,30,46,0.11);
+}
+h1{
+    font-size:24px;
+    font-weight:600;
+    margin:0 0 14px 0;
+    color:#0f172a;
+}
+h3{
+    font-size:17px;
+    font-weight:500;
+    margin:0 0 10px 0;
+}
+.row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin:12px 0;
+}
+@media(max-width:540px){
+    .row{grid-template-columns:1fr}
+}
+label{
+    display:block;
+    margin:7px 0 4px;
+    font-size:14px;
+    font-weight:450;
+    color:#2d3748;
+}
+input,select{
+    width:100%;
+    padding:11px 12px;
+    border:1px solid #cbd5e1;
+    border-radius:10px;
+    font-size:15px;
+    font-family:inherit;
+    background:#fafbfd;
+    transition: border 0.22s ease, box-shadow 0.22s ease;
+}
+input:focus,select:focus{
+    outline:none;
+    border-color:#3b82f6;
+    box-shadow:0 0 0 3px rgba(59,130,246,0.18);
+}
+button{
+    background: linear-gradient(90deg,#2563eb,#3b82f6);
+    color:#fff;
+    border:none;
+    padding:13px;
+    border-radius:10px;
+    font-size:16px;
+    font-weight:500;
+    cursor:pointer;
+    width:100%;
+    margin-top:6px;
+    transition: all 0.24s ease;
+}
+button:hover{
+    background: linear-gradient(90deg,#1d4ed8,#2563eb);
+    transform: translateY(-1px);
+}
+button:active{
+    transform: translateY(0px);
+}
+.result{
+    background: linear-gradient(145deg,#eff6ff,#e8f0fe);
+    padding:16px 18px;
+    border-radius:12px;
+    margin-top:14px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size:15px;
+    white-space:pre-wrap;
+    box-shadow: inset 0 1px 4px rgba(0,0,0,0.04);
+    line-height:1.65;
+}
+small{
+    color:#475569;
+    font-size:13px;
+    line-height:1.6;
+}
+.note{
+    color:#b91c1c;
+    font-size:12.5px;
+    margin-top:6px;
+}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>Radar‑SPD 雷达风廓线向下折算工具</h1>
+<small>热带气旋雷达观测风场向下订正工具，基于风暴边界层统计廓线数据集，用于将雷达波束高度观测风速换算至近地面参考风速。</small>
+
+<div class="row">
+<div>
+<label>计算模式</label>
+<select id="mode">
+<option value="geo">雷达几何求解波束高度</option>
+<option value="h">手动输入波束中心高度</option>
+</select>
+</div>
+<div>
+<label>廓线系数集</label>
+<select id="coeffType">
+<option value="max_wind">max_wind 核心最大风（业务优先）</option>
+<option value="av_wind">av_wind 环向平均风</option>
+<option value="rmw">1/RMW 最大风半径关联系数</option>
+</select>
+</div>
+</div>
+
+<div id="geoPanel">
+<div class="row">
+<div>
+<label>雷达高度 H (m)</label>
+<input type="number" id="antH" value="100" step="1">
+</div>
+<div>
+<label>雷达波束仰角 θ (°)</label>
+<input type="number" id="elev" value="5.0" step="0.1">
+</div>
+</div>
+<div class="row">
+<div>
+<label>目标距离 d (km)</label>
+<input type="number" id="range" value="5" step="0.1">
+</div>
+</div>
+</div>
+
+<div id="hPanel" style="display:none">
+<div>
+<label>波束中心高度 h (km)</label>
+<input type="number" id="hDirect" value="2.5" step="0.1">
+</div>
+</div>
+
+<div class="row">
+<div>
+<label>雷达实测原始风速 Vobs</label>
+<input type="number" id="vObs" value="15" step="0.1">
+</div>
+<div>
+<label>风速单位</label>
+<select id="vUnit">
+<option value="ms">m/s</option>
+<option value="kt">kt 节</option>
+</select>
+</div>
+</div>
+
+<div class="row">
+<div>
+<label>雷达采样偏差补偿 +4%</label>
+<select id="sampleCorr">
+<option value="0">关闭</option>
+<option value="1">开启 ×1.04</option>
+</select>
+</div>
+</div>
+
+<button onclick="calc()">执行换算</button>
+
+<div class="result" id="resBox">---计算结果输出区域---</div>
+<div class="note">⚠️ 高度大于16km时统计样本数量偏少，输出仅作参考，不适合用于业务分析。</div>
+</div>
+
+<div class="card">
+<h3>工具说明</h3>
+<small>
+1. 几何模式：采用4/3等效地球半径模型，考虑大气标准折射，求解雷达波束中心所在海拔高度，单位km。<br>
+2. 根据得到的高度在统计廓线数据集做线性插值，获取对应高度的风场折算系数C。<br>
+3. 换算公式：V地面 = (Vobs × 采样补偿系数) ÷ C<br>
+4. 数据集归一化参考层为2.5km，该高度折算系数等于1。低于该高度受边界层摩擦影响，系数大于1；高于该高度高空风更强，折算系数小于1。<br>
+5. N代表该高度的统计样本量，样本量越低，估算结果不确定性越高。<br>
+6. 本工具输出为统计意义上的估算值，不能替代实际观测。
+</small>
+</div>
+
+<script>
+// 统计廓线数据表 [h(km), max_wind, av_wind, 1/RMW, N]
+const tableData = [
+[0,      1.073262, 1.101892, 1.131662, 14],
+[0.5,    1.027965, 1.03714,  1.045779, 32],
+[1,      1.015858, 1.014586, 1.035349, 32],
+[1.5,    1.005565, 1.004557, 1.004222, 32],
+[2,      1.003128, 1.003054, 1.011957, 32],
+[2.5,    1,        1,        1,        32],
+[3,      0.9932,   0.989546, 0.996669, 32],
+[3.5,    0.982509, 0.9774,   0.9717,   32],
+[4,      0.97446,  0.964513, 0.966049, 32],
+[4.5,    0.960595, 0.950208, 0.962933, 32],
+[5,      0.947595, 0.934056, 0.948115, 32],
+[5.5,    0.933393, 0.916465, 0.921989, 32],
+[6,      0.917302, 0.895758, 0.90867,  32],
+[6.5,    0.900063, 0.875452, 0.892217, 32],
+[7,      0.878869, 0.857391, 0.902432, 32],
+[7.5,    0.859611, 0.8392,   0.889199, 32],
+[8,      0.842206, 0.814809, 0.892346, 32],
+[8.5,    0.824392, 0.792491, 0.838058, 32],
+[9,      0.806499, 0.771323, 0.839733, 32],
+[9.5,    0.78544,  0.749607, 0.84697,  32],
+[10,     0.766088, 0.7275,   0.805769, 32],
+[10.5,   0.74706,  0.704448, 0.806165, 32],
+[11,     0.724763, 0.679093, 0.789915, 32],
+[11.5,   0.700731, 0.653238, 0.780018, 32],
+[12,     0.675693, 0.624885, 0.734977, 32],
+[12.5,   0.650321, 0.594234, 0.714145, 32],
+[13,     0.629061, 0.567003, 0.702038, 32],
+[13.5,   0.606811, 0.539343, 0.703001, 32],
+[14,     0.580166, 0.51415,  0.704596, 32],
+[14.5,   0.547193, 0.494081, 0.715446, 32],
+[15,     0.526427, 0.479038, 0.652388, 32],
+[15.5,   0.507543, 0.472904, 0.626018, 32],
+[16,     0.477508, 0.459912, 0.603856, 31],
+[16.5,   0.440958, 0.433259, 0.484483, 26],
+[17,     0.458137, 0.434875, 0.33581,  15],
+[17.5,   0.390737, 0.405509, 0.367991, 9],
+[18,     0.358993, 0.382053, 0.498223, 3]
+];
+
+// 模式切换
+document.getElementById('mode').addEventListener('change',function(){
+    const m=this.value;
+    document.getElementById('geoPanel').style.display = m==='geo'?'block':'none';
+    document.getElementById('hPanel').style.display = m==='h'?'block':'none';
+})
+
+// 4/3等效地球半径，单位km
+const Re43 = 8490;
+
+// 雷达几何计算波束中心高度，返回 h(km)
+function beamHeight(antH_m, elev_deg, range_km){
+    const antH = antH_m /1000.0;
+    const elev = elev_deg * Math.PI/180;
+    const R = range_km;
+    const h = Math.sqrt(Re43*Re43 + R*R + 2*Re43*R*Math.sin(elev)) - Re43 + antH;
+    return h;
+}
+
+// 线性插值获取系数与样本数
+function interpTable(h, colIdx){
+    if(h <= tableData[0][0]) return [tableData[0][colIdx], tableData[0][4]];
+    if(h >= tableData[tableData.length-1][0]){
+        const last = tableData[tableData.length-1];
+        return [last[colIdx], last[4]];
+    }
+    let i=0;
+    for(;i<tableData.length-1;i++){
+        const h0 = tableData[i][0];
+        const h1 = tableData[i+1][0];
+        if(h0 <= h && h <= h1){
+            const c0 = tableData[i][colIdx];
+            const c1 = tableData[i+1][colIdx];
+            const n0 = tableData[i][4];
+            const n1 = tableData[i+1][4];
+            const w = (h-h0)/(h1-h0);
+            const c = c0*(1-w)+c1*w;
+            const n = Math.min(n0,n1);
+            return [c,n];
+        }
+    }
+    return [1,0];
+}
+
+function calc(){
+    const mode = document.getElementById('mode').value;
+    const coeffSel = document.getElementById('coeffType').value;
+    const vObs = parseFloat(document.getElementById('vObs').value);
+    const vUnit = document.getElementById('vUnit').value;
+    const sampleCorr = document.getElementById('sampleCorr').value==='1';
+
+    let h_km;
+    if(mode==='geo'){
+        const antH = parseFloat(document.getElementById('antH').value);
+        const elev = parseFloat(document.getElementById('elev').value);
+        const rng = parseFloat(document.getElementById('range').value);
+        h_km = beamHeight(antH, elev, rng);
+    }else{
+        h_km = parseFloat(document.getElementById('hDirect').value);
+    }
+
+    let col;
+    if(coeffSel==="max_wind") col=1;
+    else if(coeffSel==="av_wind") col=2;
+    else col=3;
+
+    const [C, N] = interpTable(h_km, col);
+    let vObsAdj = vObs;
+    if(sampleCorr) vObsAdj *=1.04;
+    let vGround = vObsAdj / C;
+
+    const box = document.getElementById('resBox');
+    box.innerText = 
+`波束中心高度 h: ${h_km.toFixed(3)} km
+廓线折算系数 C: ${C.toFixed(6)}
+原始观测风速: ${vObs.toFixed(2)} ${vUnit}
+采样偏差补偿: ${sampleCorr?"开启 ×1.04":"关闭"}
+补偿后观测风速: ${vObsAdj.toFixed(2)} ${vUnit}
+统计样本数量 N: ${N}
+----------------------------------------
+估算近地面参考风速: ${vGround.toFixed(2)} ${vUnit}`;
+}
+calc();
+</script>
+</body>
+</html>
+
