@@ -125,7 +125,7 @@ small{
 <small>热带气旋雷达观测风场向下订正工具，基于风暴边界层统计廓线数据集，用于将雷达波束高度观测风速换算至近地面参考风速。</small>
 <div class="row">
 <div>
-<label>廓线系数集</label>
+<label>廓线系数集 <strong>（建议使用环向平均风模式）</strong></label>
 <select id="coeffType">
 <option value="max_wind">max_wind 核心最大风</option>
 <option value="av_wind">av_wind 环向平均风（推荐）</option>
@@ -137,17 +137,17 @@ small{
 <div class="row">
 <div>
 <label>雷达高度 H (m)</label>
-<input type="number" id="antH" value="3000" step="1">
+<input type="number" id="antH" value="125" step="1">
 </div>
 <div>
 <label>雷达波束仰角 θ (°)</label>
-<input type="number" id="elev" value="5.0" step="0.1">
+<input type="number" id="elev" value="1.5" step="0.1">
 </div>
 </div>
 <div class="row">
 <div>
 <label>目标距离 d (km)</label>
-<input type="number" id="range" value="5" step="0.1">
+<input type="number" id="range" value="50" step="0.1">
 </div>
 </div>
 </div>
@@ -158,14 +158,15 @@ small{
 </div>
 <div>
 <label>风速单位</label>
-<select id="vUnit">
+<select id="vUnit" onchange="onUnitChange()">
 <option value="ms">m/s</option>
+<option value="kt">kt</option>
 </select>
 </div>
 </div>
 <div class="row">
 <div>
-<label>雷达采样偏差补偿 +4%</label>
+<label>雷达采样偏差补偿 +4% <strong>（波束中心高度＞3km时开启）</strong></label>
 <select id="sampleCorr">
 <option value="0">关闭</option>
 <option value="1">开启 ×1.04</option>
@@ -187,7 +188,31 @@ small{
 6. 本工具输出为统计意义上的估算值，不能替代实际观测。
 </small>
 </div>
+<p style="margin-top:24px;"><strong>平均风时距互换算可使用该功能 <a href="https://www.bamc.top/cyclone/" target="_blank">https://www.bamc.top/cyclone/</a></strong></p>
 <script>
+// 精确换算：1 kt = 0.51444444 m/s；1 m/s = 1.94384449 kt
+const KT_TO_MS = 0.51444444;
+const MS_TO_KT = 1.94384449;
+
+// 单位切换回调：切换下拉时同步换算输入框数值
+function onUnitChange(){
+    const vObsInput = document.getElementById('vObs');
+    const unitSel = document.getElementById('vUnit');
+    const oldUnit = unitSel.value === 'ms' ? 'kt' : 'ms';
+    const val = parseFloat(vObsInput.value);
+    if(isNaN(val)) return;
+
+    let newVal;
+    if(oldUnit === "ms"){
+        // 原m/s → 切换kt
+        newVal = val * MS_TO_KT;
+    }else{
+        // 原kt → 切换m/s
+        newVal = val * KT_TO_MS;
+    }
+    vObsInput.value = newVal.toFixed(2);
+}
+
 // 统计廓线数据表 [h(km), max_wind, av_wind, 1/RMW, N]
 const tableData = [
 [0,      1.073262, 1.101892, 1.131662, 14],
@@ -264,33 +289,53 @@ function interpTable(h, colIdx){
 }
 function calc(){
     const coeffSel = document.getElementById('coeffType').value;
-    const vObs = parseFloat(document.getElementById('vObs').value);
+    const vObsInput = parseFloat(document.getElementById('vObs').value);
     const vUnit = document.getElementById('vUnit').value;
     const sampleCorr = document.getElementById('sampleCorr').value==='1';
-
     const antH = parseFloat(document.getElementById('antH').value);
     const elev = parseFloat(document.getElementById('elev').value);
     const rng = parseFloat(document.getElementById('range').value);
     const h_km = beamHeight(antH, elev, rng);
-
     let col;
     if(coeffSel==="max_wind") col=1;
     else if(coeffSel==="av_wind") col=2;
     else col=3;
     const [C, N] = interpTable(h_km, col);
-    let vObsAdj = vObs;
-    if(sampleCorr) vObsAdj *=1.04;
-    let vGround = vObsAdj / C;
+
+    // 输入kt，转换为m/s做内部计算
+    let vObsMs;
+    if(vUnit === "kt"){
+        vObsMs = vObsInput * KT_TO_MS;
+    }else{
+        vObsMs = vObsInput;
+    }
+
+    let vObsAdjMs = vObsMs;
+    if(sampleCorr) vObsAdjMs *=1.04;
+    let vGroundMs = vObsAdjMs / C;
+
+    // 根据输入单位回显输出
+    let vObsDisplay, vAdjDisplay, vGroundDisplay;
+    if(vUnit === "kt"){
+        vObsDisplay = vObsInput;
+        vAdjDisplay = vObsAdjMs / KT_TO_MS;
+        vGroundDisplay = vGroundMs / KT_TO_MS;
+    }else{
+        vObsDisplay = vObsInput;
+        vAdjDisplay = vObsAdjMs;
+        vGroundDisplay = vGroundMs;
+    }
+
     const box = document.getElementById('resBox');
     box.innerText = 
 `波束中心高度 h: ${h_km.toFixed(3)} km
 廓线折算系数 C: ${C.toFixed(6)}
-原始观测风速: ${vObs.toFixed(2)} ${vUnit}
+原始观测风速: ${vObsDisplay.toFixed(2)} ${vUnit}
 采样偏差补偿: ${sampleCorr?"开启 ×1.04":"关闭"}
-补偿后观测风速: ${vObsAdj.toFixed(2)} ${vUnit}
+补偿后观测风速: ${vAdjDisplay.toFixed(2)} ${vUnit}
 统计样本数量 N: ${N}
 ----------------------------------------
-估算近地面参考风速: ${vGround.toFixed(2)} ${vUnit}`;
+估算近地面参考风速: ${vGroundDisplay.toFixed(2)} ${vUnit}`;
 }
 calc();
 </script>
