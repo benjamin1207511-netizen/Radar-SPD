@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Radar‑SPD 雷达风廓线向下折算工具</title>
+<title>Radar‑SPD v2 雷达风廓线向下折算工具</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -96,16 +96,42 @@ button:hover{
 button:active{
     transform: translateY(0px);
 }
+.checkbox-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin:10px 0;
+    padding:10px 12px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:10px;
+}
+.checkbox-row input[type="checkbox"]{
+    width:auto;
+    margin:0;
+    accent-color:#3b82f6;
+    cursor:pointer;
+}
+.checkbox-row label{
+    margin:0;
+    font-size:14px;
+    cursor:pointer;
+    user-select:none;
+}
 .result{
     background: linear-gradient(145deg,#eff6ff,#e8f0fe);
     padding:16px 18px;
     border-radius:12px;
     margin-top:14px;
     font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size:15px;
+    font-size:14.5px;
     white-space:pre-wrap;
     box-shadow: inset 0 1px 4px rgba(0,0,0,0.04);
     line-height:1.65;
+}
+.result.error{
+    background: linear-gradient(145deg,#fef2f2,#fee2e2);
+    color:#b91c1c;
 }
 small{
     color:#475569;
@@ -121,40 +147,16 @@ small{
 </head>
 <body>
 <div class="card">
-<h1>Radar‑SPD 雷达风廓线向下折算工具</h1>
-<small>热带气旋雷达观测风场向下订正工具，基于风暴边界层统计廓线数据集，用于将雷达波束高度观测风速换算至近地面参考风速。</small>
+<h1>Radar‑SPD v2 雷达风廓线向下折算工具</h1>
+<small>热带气旋雷达观测风场向下订正工具。直接使用统计基准系数表，将雷达波束高度（0.5–8 km）观测风速换算至近地面 10 m 参考风速。</small>
+
 <div class="row">
 <div>
-<label>廓线系数集 <strong>（建议使用环向平均风模式）</strong></label>
-<select id="coeffType">
-<option value="max_wind">max_wind 核心最大风</option>
-<option value="av_wind">av_wind 环向平均风（推荐）</option>
-<option value="rmw">1/RMW 最大风半径关联系数</option>
+<label>区域类型 <strong>（眼壁 / 外围）</strong></label>
+<select id="regionSel">
+<option value="eyewall">眼壁 Eyewall</option>
+<option value="outer">外围 Outer Vortex</option>
 </select>
-</div>
-</div>
-<div id="geoPanel">
-<div class="row">
-<div>
-<label>雷达高度 H (m)</label>
-<input type="number" id="antH" value="125" step="1">
-</div>
-<div>
-<label>雷达波束仰角 θ (°)</label>
-<input type="number" id="elev" value="1.5" step="0.1">
-</div>
-</div>
-<div class="row">
-<div>
-<label>目标距离 d (km)</label>
-<input type="number" id="range" value="50" step="0.1">
-</div>
-</div>
-</div>
-<div class="row">
-<div>
-<label>雷达实测原始风速 Vobs</label>
-<input type="number" id="vObs" value="15" step="0.1">
 </div>
 <div>
 <label>风速单位</label>
@@ -164,179 +166,249 @@ small{
 </select>
 </div>
 </div>
+
 <div class="row">
 <div>
-<label>雷达采样偏差补偿 +4% <strong>（波束中心高度＞3km时开启）</strong></label>
-<select id="sampleCorr">
-<option value="0">关闭</option>
-<option value="1">开启 ×1.04</option>
-</select>
+<label>雷达高度 H (m)</label>
+<input type="number" id="antH" value="198" step="1">
+</div>
+<div>
+<label>雷达波束仰角 θ (°)</label>
+<input type="number" id="elev" value="0.2" step="0.05">
 </div>
 </div>
+<div class="row">
+<div>
+<label>目标距离 d (km)</label>
+<input type="number" id="range" value="145" step="0.1">
+</div>
+<div>
+<label>阵风因子 G（可选，默认 1.3）</label>
+<input type="number" id="gustF" value="1.3" step="0.05">
+</div>
+</div>
+
+<div class="row">
+<div>
+<label>雷达实测原始风速 Vobs</label>
+<input type="number" id="vObs" value="67" step="0.1">
+</div>
+</div>
+
+<div class="checkbox-row">
+<input type="checkbox" id="compToggle">
+<label for="compToggle">启用采样补偿</label>
+</div>
+
 <button onclick="calc()">执行换算</button>
-<div class="result" id="resBox">---计算结果输出区域---</div>
-<div class="note">⚠️ 高度大于16km时统计样本数量偏少，输出仅作参考，不适合用于业务分析。</div>
+<div class="result" id="resBox">--- 计算结果输出区域 ---</div>
+<div class="note">⚠️ 本工具仅适用于 0.5–8 km 高度范围。波束高度超出范围时不进行换算。</div>
 </div>
+
 <div class="card">
 <h3>工具说明</h3>
 <small>
-1. 几何模式：采用4/3等效地球半径模型，考虑大气标准折射，求解雷达波束中心所在海拔高度，单位km。<br>
-2. 根据得到的高度在统计廓线数据集做线性插值，获取对应高度的风场折算系数C。<br>
-3. 换算公式：V地面 = (Vobs × 采样补偿系数) ÷ C<br>
-4. 数据集归一化参考层为2.5km，该高度折算系数等于1。低于该高度受边界层摩擦影响，系数大于1；高于该高度高空风更强，折算系数小于1。<br>
-5. N代表该高度的统计样本量，样本量越低，估算结果不确定性越高。<br>
-6. 本工具输出为统计意义上的估算值，不能替代实际观测。
+1. 波束中心高度由雷达几何公式计算：<br>
+&nbsp;&nbsp;&nbsp;Z_obs = H_radar + d·sinθ + d²/(2·k_e·R_e)，取 k_e = 4/3。<br>
+2. 若 Z_obs 在 0.5–8 km 范围内，则在眼壁/外围基准系数表中线性插值，获取基准系数 K_base。<br>
+3. 换算公式：V₁₀ = Vobs × K final；V gust = V₁₀ × G。<br>
+4. 本工具输出为统计意义上的估算值，不能替代实际观测。<br>
 </small>
 </div>
+
+<div class="card">
+<h3>基准系数表（眼壁 / 外围，0.5–8 km）</h3>
+<strong>使用方法</strong>：K_final = K_base × (1 + 补偿)，V₁₀ = Vobs × K_final。
+</small>
+<table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;">
+<thead>
+<tr style="background:#f1f5f9;">
+<th style="padding:6px; border:1px solid #cbd5e1;">z (km)</th>
+<th style="padding:6px; border:1px solid #cbd5e1;">眼壁 K_base</th>
+<th style="padding:6px; border:1px solid #cbd5e1;">外围 K_base</th>
+</tr>
+</thead>
+<tbody id="tableBody"></tbody>
+</table>
+</div>
+
 <p style="margin-top:24px;"><strong>平均风时距互换算可使用该功能 <a href="https://www.bamc.top/cyclone/" target="_blank">https://www.bamc.top/cyclone/</a></strong></p>
+
 <script>
-// 精确换算：1 kt = 0.51444444 m/s；1 m/s = 1.94384449 kt
+// ===== 单位换算常量 =====
 const KT_TO_MS = 0.51444444;
 const MS_TO_KT = 1.94384449;
 
-// 单位切换回调：切换下拉时同步换算输入框数值
+// ===== 高度范围限制 =====
+const H_MIN_KM = 0.5;
+const H_MAX_KM = 8.0;
+
+// ===== 单位切换 =====
+let lastUnit = 'ms';
 function onUnitChange(){
     const vObsInput = document.getElementById('vObs');
     const unitSel = document.getElementById('vUnit');
-    const oldUnit = unitSel.value === 'ms' ? 'kt' : 'ms';
+    const newUnit = unitSel.value;
     const val = parseFloat(vObsInput.value);
-    if(isNaN(val)) return;
-
-    let newVal;
-    if(oldUnit === "ms"){
-        // 原m/s → 切换kt
-        newVal = val * MS_TO_KT;
-    }else{
-        // 原kt → 切换m/s
-        newVal = val * KT_TO_MS;
+    if(isNaN(val)) { lastUnit = newUnit; return; }
+    if(lastUnit === 'ms' && newUnit === 'kt'){
+        vObsInput.value = (val * MS_TO_KT).toFixed(2);
+    } else if(lastUnit === 'kt' && newUnit === 'ms'){
+        vObsInput.value = (val * KT_TO_MS).toFixed(2);
     }
-    vObsInput.value = newVal.toFixed(2);
+    lastUnit = newUnit;
 }
 
-// 统计廓线数据表 [h(km), max_wind, av_wind, 1/RMW, N]
+// ===== 基准系数表（0.5–8 km）=====
+// [h(km), 眼壁K_base, 外围K_base]
 const tableData = [
-[0,      1.073262, 1.101892, 1.131662, 14],
-[0.5,    1.027965, 1.03714,  1.045779, 32],
-[1,      1.015858, 1.014586, 1.035349, 32],
-[1.5,    1.005565, 1.004557, 1.004222, 32],
-[2,      1.003128, 1.003054, 1.011957, 32],
-[2.5,    1,        1,        1,        32],
-[3,      0.9932,   0.989546, 0.996669, 32],
-[3.5,    0.982509, 0.9774,   0.9717,   32],
-[4,      0.97446,  0.964513, 0.966049, 32],
-[4.5,    0.960595, 0.950208, 0.962933, 32],
-[5,      0.947595, 0.934056, 0.948115, 32],
-[5.5,    0.933393, 0.916465, 0.921989, 32],
-[6,      0.917302, 0.895758, 0.90867,  32],
-[6.5,    0.900063, 0.875452, 0.892217, 32],
-[7,      0.878869, 0.857391, 0.902432, 32],
-[7.5,    0.859611, 0.8392,   0.889199, 32],
-[8,      0.842206, 0.814809, 0.892346, 32],
-[8.5,    0.824392, 0.792491, 0.838058, 32],
-[9,      0.806499, 0.771323, 0.839733, 32],
-[9.5,    0.78544,  0.749607, 0.84697,  32],
-[10,     0.766088, 0.7275,   0.805769, 32],
-[10.5,   0.74706,  0.704448, 0.806165, 32],
-[11,     0.724763, 0.679093, 0.789915, 32],
-[11.5,   0.700731, 0.653238, 0.780018, 32],
-[12,     0.675693, 0.624885, 0.734977, 32],
-[12.5,   0.650321, 0.594234, 0.714145, 32],
-[13,     0.629061, 0.567003, 0.702038, 32],
-[13.5,   0.606811, 0.539343, 0.703001, 32],
-[14,     0.580166, 0.51415,  0.704596, 32],
-[14.5,   0.547193, 0.494081, 0.715446, 32],
-[15,     0.526427, 0.479038, 0.652388, 32],
-[15.5,   0.507543, 0.472904, 0.626018, 32],
-[16,     0.477508, 0.459912, 0.603856, 31],
-[16.5,   0.440958, 0.433259, 0.484483, 26],
-[17,     0.458137, 0.434875, 0.33581,  15],
-[17.5,   0.390737, 0.405509, 0.367991, 9],
-[18,     0.358993, 0.382053, 0.498223, 3]
+[0.5, 0.760, 0.710],
+[1.0, 0.780, 0.700],
+[1.5, 0.830, 0.740],
+[2.0, 0.860, 0.760],
+[2.5, 0.910, 0.780],
+[3.0, 0.915, 0.790],
+[3.5, 0.920, 0.790],
+[4.0, 0.925, 0.800],
+[4.5, 0.930, 0.800],
+[5.0, 0.960, 0.825],
+[5.5, 0.975, 0.840],
+[6.0, 1.000, 0.860],
+[6.5, 1.005, 0.865],
+[7.0, 1.045, 0.900],
+[7.5, 1.080, 0.930],
+[8.0, 1.090, 0.940]
 ];
-// 4/3等效地球半径，单位km
+
+// 4/3 等效地球半径，单位 km
 const Re43 = 8490;
+
 // 雷达几何计算波束中心高度，返回 h(km)
 function beamHeight(antH_m, elev_deg, range_km){
-    const antH = antH_m /1000.0;
-    const elev = elev_deg * Math.PI/180;
+    const antH = antH_m / 1000.0;
+    const elev = elev_deg * Math.PI / 180;
     const R = range_km;
     const h = Math.sqrt(Re43*Re43 + R*R + 2*Re43*R*Math.sin(elev)) - Re43 + antH;
     return h;
 }
-// 线性插值获取系数与样本数
+
+// 线性插值获取基准系数（仅 0.5–8 km 内有效）
 function interpTable(h, colIdx){
-    if(h <= tableData[0][0]) return [tableData[0][colIdx], tableData[0][4]];
-    if(h >= tableData[tableData.length-1][0]){
-        const last = tableData[tableData.length-1];
-        return [last[colIdx], last[4]];
-    }
-    let i=0;
-    for(;i<tableData.length-1;i++){
+    if(h <= tableData[0][0]) return tableData[0][colIdx];
+    if(h >= tableData[tableData.length-1][0]) return tableData[tableData.length-1][colIdx];
+    for(let i = 0; i < tableData.length - 1; i++){
         const h0 = tableData[i][0];
         const h1 = tableData[i+1][0];
         if(h0 <= h && h <= h1){
             const c0 = tableData[i][colIdx];
             const c1 = tableData[i+1][colIdx];
-            const n0 = tableData[i][4];
-            const n1 = tableData[i+1][4];
-            const w = (h-h0)/(h1-h0);
-            const c = c0*(1-w)+c1*w;
-            const n = Math.min(n0,n1);
-            return [c,n];
+            const w = (h - h0) / (h1 - h0);
+            return c0 * (1 - w) + c1 * w;
         }
     }
-    return [1,0];
+    return 1;
 }
+
+// ===== 采样补偿函数 =====
+// h ≤ 3 km：+2.5%
+// 3 < h ≤ 8 km：从 +2.5% 线性增加至 +6%
+function compensation(h_km){
+    if(h_km <= 3.0) return 0.025;
+    if(h_km >= 8.0) return 0.060;
+    return 0.025 + (h_km - 3.0) * 0.007;
+}
+
+// ===== 主计算 =====
 function calc(){
-    const coeffSel = document.getElementById('coeffType').value;
+    const box = document.getElementById('resBox');
+    const region = document.getElementById('regionSel').value;
     const vObsInput = parseFloat(document.getElementById('vObs').value);
     const vUnit = document.getElementById('vUnit').value;
-    const sampleCorr = document.getElementById('sampleCorr').value==='1';
     const antH = parseFloat(document.getElementById('antH').value);
     const elev = parseFloat(document.getElementById('elev').value);
     const rng = parseFloat(document.getElementById('range').value);
+    const gustF = parseFloat(document.getElementById('gustF').value) || 1.3;
+    const useComp = document.getElementById('compToggle').checked;
+
     const h_km = beamHeight(antH, elev, rng);
-    let col;
-    if(coeffSel==="max_wind") col=1;
-    else if(coeffSel==="av_wind") col=2;
-    else col=3;
-    const [C, N] = interpTable(h_km, col);
 
-    // 输入kt，转换为m/s做内部计算
-    let vObsMs;
-    if(vUnit === "kt"){
-        vObsMs = vObsInput * KT_TO_MS;
-    }else{
-        vObsMs = vObsInput;
+    // 高度范围检查
+    if(h_km < H_MIN_KM || h_km > H_MAX_KM){
+        box.className = 'result error';
+        box.innerText =
+`❌ 波束中心高度 h = ${h_km.toFixed(3)} km
+超出本工具适用范围（0.5–8 km）。
+
+请调整雷达几何参数后重试，或使用其他方法估算。`;
+        return;
     }
 
-    let vObsAdjMs = vObsMs;
-    if(sampleCorr) vObsAdjMs *=1.04;
-    let vGroundMs = vObsAdjMs / C;
+    box.className = 'result';
 
-    // 根据输入单位回显输出
-    let vObsDisplay, vAdjDisplay, vGroundDisplay;
-    if(vUnit === "kt"){
-        vObsDisplay = vObsInput;
-        vAdjDisplay = vObsAdjMs / KT_TO_MS;
-        vGroundDisplay = vGroundMs / KT_TO_MS;
-    }else{
-        vObsDisplay = vObsInput;
-        vAdjDisplay = vObsAdjMs;
-        vGroundDisplay = vGroundMs;
+    const col = (region === 'eyewall') ? 1 : 2;
+    const K_base = interpTable(h_km, col);
+
+    let comp = 0;
+    let K_final = K_base;
+    if(useComp){
+        comp = compensation(h_km);
+        K_final = K_base * (1 + comp);
     }
 
-    const box = document.getElementById('resBox');
-    box.innerText = 
-`波束中心高度 h: ${h_km.toFixed(3)} km
-廓线折算系数 C: ${C.toFixed(6)}
-原始观测风速: ${vObsDisplay.toFixed(2)} ${vUnit}
-采样偏差补偿: ${sampleCorr?"开启 ×1.04":"关闭"}
-补偿后观测风速: ${vAdjDisplay.toFixed(2)} ${vUnit}
-统计样本数量 N: ${N}
+    let vObsMs = (vUnit === 'kt') ? vObsInput * KT_TO_MS : vObsInput;
+    let v10Ms = vObsMs * K_final;
+    let vGustMs = v10Ms * gustF;
+
+    let v10Display, vGustDisplay;
+    if(vUnit === 'kt'){
+        v10Display = v10Ms / KT_TO_MS;
+        vGustDisplay = vGustMs / KT_TO_MS;
+    } else {
+        v10Display = v10Ms;
+        vGustDisplay = vGustMs;
+    }
+
+    const regionLabel = (region === 'eyewall') ? '眼壁' : '外围雨带';
+
+    let output =
+`区域类型:              ${regionLabel}
+波束中心高度 h:        ${h_km.toFixed(3)} km
+基准系数 K base:       ${K_base.toFixed(4)}`;
+
+    if(useComp){
+        output +=
+`\n采样补偿:              +${(comp * 100).toFixed(2)}%
+最终系数 K final:      ${K_final.toFixed(4)}`;
+    } else {
+        output +=
+`\n最终系数 K final:      ${K_final.toFixed(4)}`;
+    }
+
+    output +=
+`\n原始观测风速:          ${vObsInput.toFixed(2)} ${vUnit}
 ----------------------------------------
-估算近地面参考风速: ${vGroundDisplay.toFixed(2)} ${vUnit}`;
+估算近地面 10 m 平均风速: ${v10Display.toFixed(2)} ${vUnit}
+估算近地面阵风 (G=${gustF}): ${vGustDisplay.toFixed(2)} ${vUnit}`;
+
+    box.innerText = output;
 }
+
+// ===== 渲染基准系数表 =====
+function renderTable(){
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    for(let i = 0; i < tableData.length; i++){
+        const [h, ew, out] = tableData[i];
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+            `<td style="padding:5px;border:1px solid #e2e8f0;text-align:center;">${h.toFixed(1)}</td>` +
+            `<td style="padding:5px;border:1px solid #e2e8f0;text-align:center;">${ew.toFixed(3)}</td>` +
+            `<td style="padding:5px;border:1px solid #e2e8f0;text-align:center;">${out.toFixed(3)}</td>`;
+        tbody.appendChild(tr);
+    }
+}
+
+renderTable();
 calc();
 </script>
 </body>
